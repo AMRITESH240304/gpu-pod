@@ -36,6 +36,26 @@ GPUs are expensive and unevenly distributed. A developer might have a Mac with n
 └─────────────────────────────────────────────────────────┘
 ```
 
+### Sequence Diagram (Mermaid)
+
+```mermaid
+sequenceDiagram
+    participant Mac as Mac (Client)
+    participant API as FastAPI Server
+    participant Worker as Windows Worker
+
+    Mac->>API: Submit Job
+    API->>Worker: Assign Job
+
+    loop Poll Until Complete
+        Mac->>API: Poll Result
+        API-->>Mac: Pending / Status
+    end
+
+    Worker-->>API: Return Result
+    API-->>Mac: Final Result
+```
+
 Two roles emerge naturally:
 
 | Role | Who | What they do |
