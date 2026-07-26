@@ -259,6 +259,8 @@ class GPUApp:
         ts = datetime.now().strftime("%H:%M:%S")
         self.log_text.insert("end", f"[{ts}] {msg}\n")
         self.log_text.see("end")
+        # Also send to SigNoz via OTel logger
+        logger.info(msg)
 
     # ──────────────────── USER DASHBOARD ────────────────────
 

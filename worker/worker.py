@@ -40,6 +40,15 @@ jobs_executed = meter.create_counter("worker.jobs.executed", unit="1", descripti
 job_duration_histogram = meter.create_histogram("worker.job.duration", unit="s", description="Job execution time")
 
 
+def _log(msg: str):
+    """Print to terminal AND send to SigNoz via OTel logger."""
+    print(msg)
+    # Strip ANSI/formatting for clean log body
+    clean = msg.strip().lstrip("\n=")
+    if clean:
+        logger.info(clean)
+
+
 # ─── GPU Detection ───
 
 def detect_gpu():
@@ -70,14 +79,13 @@ def register():
             r.raise_for_status()
             WORKER_ID = r.json()["worker_id"]
             span.set_attribute("worker.id", WORKER_ID)
-            logger.info("worker registered", extra={"worker_id": WORKER_ID, "gpu": gpu_model})
-            print(f"[OK] Registered | ID: {WORKER_ID} | GPU: {gpu_model} | VRAM: {vram_gb}GB")
+            _log(f"[OK] Registered | ID: {WORKER_ID} | GPU: {gpu_model} | VRAM: {vram_gb}GB")
             return True
         except requests.exceptions.ConnectionError:
-            print(f"[FAIL] Cannot reach server at {CONFIG['server_url']}")
+            _log(f"[FAIL] Cannot reach server at {CONFIG['server_url']}")
             return False
         except Exception as e:
-            print(f"[FAIL] Registration error: {e}")
+            _log(f"[FAIL] Registration error: {e}")
             return False
 
 def send_heartbeat():
@@ -95,7 +103,7 @@ def send_heartbeat():
             return job
         except Exception as e:
             span.set_attribute("error", str(e))
-            print(f"[WARN] Heartbeat failed: {e}")
+            _log(f"[WARN] Heartbeat failed: {e}")
             return None
 
 def send_result(job_id, success, error=""):
@@ -107,7 +115,7 @@ def send_result(job_id, success, error=""):
                 "worker_id": WORKER_ID, "job_id": job_id, "success": success, "error": error,
             }, timeout=10)
         except Exception as e:
-            print(f"[FAIL] Could not send result: {e}")
+            _log(f"[FAIL] Could not send result: {e}")
 
 
 # ─── Job Execution ───
@@ -124,11 +132,11 @@ def execute_job(job: dict):
         if prompt:
             span.set_attribute("job.prompt", prompt[:80])
 
-        print(f"\n{'='*50}")
-        print(f"[JOB] {job_id} | Type: {task_type}")
+        _log(f"\n{'='*50}")
+        _log(f"[JOB] {job_id} | Type: {task_type}")
         if prompt:
-            print(f"      Prompt: {prompt[:80]}")
-        print(f"{'='*50}")
+            _log(f"      Prompt: {prompt[:80]}")
+        _log(f"{'='*50}")
 
         start_ts = time.time()
 
@@ -141,14 +149,14 @@ def execute_job(job: dict):
             device = torch.device("cuda")
             gpu_name = torch.cuda.get_device_name(0)
             span.set_attribute("worker.gpu", gpu_name)
-            print(f"[GPU] {gpu_name}")
+            _log(f"[GPU] {gpu_name}")
 
             result = {}
 
             if task_type == "matrix-multiply" or task_type == "compute":
                 size = params.get("size", 2048)
                 span.set_attribute("matrix.size", size)
-                print(f"[WORK] Multiplying {size}x{size} matrices on GPU...")
+                _log(f"[WORK] Multiplying {size}x{size} matrices on GPU...")
                 a = torch.randn(size, size, device=device)
                 b = torch.randn(size, size, device=device)
 
@@ -170,7 +178,7 @@ def execute_job(job: dict):
                     "tflops": round(flops, 2),
                     "device": gpu_name,
                 }
-                print(f"[DONE] {result}")
+                _log(f"[DONE] {result}")
 
             elif task_type == "tensor-info":
                 result = {
@@ -180,18 +188,18 @@ def execute_job(job: dict):
                     "allocated_gb": round(torch.cuda.memory_allocated(0) / 1024**3, 2),
                     "reserved_gb": round(torch.cuda.memory_reserved(0) / 1024**3, 2),
                 }
-                print(f"[DONE] GPU info: {result}")
+                _log(f"[DONE] GPU info: {result}")
 
             else:
                 code = prompt or params.get("code", "")
                 if not code:
                     raise ValueError(f"Unknown task '{task_type}'. Try: compute, tensor-info, or send code")
-                print(f"[WORK] Executing user code...")
+                _log(f"[WORK] Executing user code...")
                 local_vars = {"torch": torch, "device": torch.device("cuda"),
                               "WORK_DIR": str(WORK_DIR), "job_id": job_id, "params": params}
                 exec(code, local_vars)
                 result = local_vars.get("result", "Code executed successfully")
-                print(f"[DONE] Code executed")
+                _log("[DONE] Code executed")
                 span.add_event("custom_code_executed")
 
             # Save & report
@@ -207,18 +215,17 @@ def execute_job(job: dict):
             error_msg = f"{e}\n{traceback.format_exc()}"
             span.set_attribute("error", str(e)[:200])
             span.set_status(Status(StatusCode.ERROR, str(e)[:200]))
-            print(f"[ERROR] {error_msg}")
+            _log(f"[ERROR] {error_msg}")
             send_result(job_id, success=False, error=error_msg)
-            logger.error("job failed", extra={"job_id": job_id, "error": str(e)})
 
 
 # ─── Main Loop ───
 
 def main():
-    print("=" * 50)
-    print("  GPU Pod Worker — OTel enabled")
-    print("  SigNoz @ localhost:4317")
-    print("=" * 50)
+    _log("=" * 50)
+    _log("  GPU Pod Worker — OTel enabled")
+    _log("  SigNoz @ localhost:4317")
+    _log("=" * 50)
 
     if not register():
         time.sleep(10)

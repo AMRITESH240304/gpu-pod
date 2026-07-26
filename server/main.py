@@ -173,7 +173,7 @@ def _assign_pending_jobs():
             conn.execute("UPDATE workers SET status='busy' WHERE id=?", (worker["id"],))
             conn.commit()
             conn.close()
-            print(f"[ASSIGN] Job {job_id} → Worker {worker['name']} ({worker['id']})")
+            logger.info(f"[ASSIGN] Job {job_id} → Worker {worker['name']} ({worker['id']})")
 
 def _sweep_dead_workers():
     """Mark workers as dead if no heartbeat for 60 seconds."""
@@ -189,7 +189,7 @@ def _sweep_dead_workers():
         conn.commit()
         conn.close()
         for wid in dead_ids:
-            print(f"[DEAD] Worker {wid} marked dead (no heartbeat for 60s)")
+            logger.info(f"[DEAD] Worker {wid} marked dead (no heartbeat for 60s)")
 
 # ──────────────────────── Background Sweeper ────────────────────────
 
@@ -235,7 +235,7 @@ def register_worker(reg: WorkerRegister, request: Request):
         span.set_attribute("worker.gpu", reg.gpu_model)
         logger.info("worker registered", extra={"worker_id": worker_id, "gpu": reg.gpu_model})
 
-        print(f"[REGISTER] New worker: {reg.name} | GPU: {reg.gpu_model} | VRAM: {reg.vram_gb}GB | IP: {client_ip}")
+        logger.info(f"[REGISTER] New worker: {reg.name} | GPU: {reg.gpu_model} | VRAM: {reg.vram_gb}GB | IP: {client_ip}")
 
         return {
             "worker_id": worker_id,
@@ -270,7 +270,7 @@ def heartbeat(hb: Heartbeat):
                     conn.commit()
                     span.add_event("job.assigned", {"job_id": job_id, "worker_id": hb.worker_id})
                     queue_depth_gauge.add(-1)
-                    print(f"[ASSIGN] Job {job_id} → Worker {hb.worker_id} (via heartbeat)")
+                    logger.info(f"[ASSIGN] Job {job_id} → Worker {hb.worker_id} (via heartbeat)")
 
         # Check if there's work for this worker (may have just been assigned)
         assigned = None
@@ -332,7 +332,7 @@ def submit_job(job: JobSubmit):
 
         job_counter.add(1)
         logger.info("job submitted", extra={"job_id": job_id, "type": job.task_type})
-        print(f"[NEW JOB] {job_id} | Type: {job.task_type} | Prompt: {job.prompt[:60]}")
+        logger.info(f"[NEW JOB] {job_id} | Type: {job.task_type} | Prompt: {job.prompt[:60]}")
 
         # Try to assign immediately
         _assign_pending_jobs()
@@ -413,7 +413,7 @@ async def submit_result(result: JobResult, request: Request):
 
         logger.info("job completed" if result.success else "job failed",
                     extra={"job_id": result.job_id, "success": result.success})
-        print(f"[RESULT] Job {result.job_id} → {'COMPLETED' if result.success else 'FAILED'}")
+        logger.info(f"[RESULT] Job {result.job_id} → {'COMPLETED' if result.success else 'FAILED'}")
 
         # Check if we can assign more pending jobs
         _assign_pending_jobs()
@@ -423,15 +423,15 @@ async def submit_result(result: JobResult, request: Request):
 # ──────────────────────── Entrypoint ────────────────────────
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("  GPU Pod Coordinator Server")
-    print("  http://0.0.0.0:8000")
-    print("  Docs: http://localhost:8000/docs")
-    print("  OTel → SigNoz @ localhost:4317")
-    print("=" * 50)
+    logger.info("=" * 50)
+    logger.info("  GPU Pod Coordinator Server")
+    logger.info("  http://0.0.0.0:8000")
+    logger.info("  Docs: http://localhost:8000/docs")
+    logger.info("  OTel → SigNoz @ localhost:4317")
+    logger.info("=" * 50)
     logger.info("server starting", extra={"port": 8000})
     try:
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        uvicorn.run(app, host="192.168.0.107", port=8000)
     finally:
         from gpu_pod_otel import shutdown as otel_shutdown
         otel_shutdown()
