@@ -18,9 +18,26 @@ uv sync
 uv run python main.py
 ```
 
-### 2. Start the worker (on Windows)
+### 2. Start the worker — two options (on Windows)
 
-Copy the `worker/` folder to your Windows laptop, then:
+**Option A — Desktop GUI (recommended if you want live GPU stats):**
+Copy the entire `client/` folder to your Windows laptop, then:
+
+```powershell
+cd client
+uv venv --python 3.13
+.venv\Scripts\activate
+uv sync
+
+set GPU_POD_SERVER_URL=http://<mac-ip>:8000
+
+uv run python main.py
+```
+
+A GUI window opens. Click **"I'm a GPU Provider"** → Start Worker. You'll see live GPU utilization, VRAM, and temperature.
+
+**Option B — Headless worker (lightweight, no GUI):**
+Copy just the `worker/` folder to your Windows laptop, then:
 
 ```powershell
 cd worker
@@ -39,7 +56,7 @@ You'll see:
 [OK] Registered | ID: a1b2c3d4 | GPU: NVIDIA GeForce GTX 1650 | VRAM: 4.0GB
 ```
 
-> **Note:** The `pyproject.toml` is pre-configured to pull the CUDA 12.4 build of PyTorch from `download.pytorch.org/whl/cu124`. If your NVIDIA driver supports a different CUDA version, change `cu124` in `pyproject.toml` to your version (e.g. `cu118`, `cu121`). Check with `nvidia-smi`.
+> ⚠️ Both `client/` and `worker/` have PyTorch pre-configured for CUDA 12.4 in their `pyproject.toml`. If your NVIDIA driver needs a different version (check with `nvidia-smi`), change `cu124` to `cu118`, `cu121`, etc.
 
 ### 3. Launch the desktop app (on your Mac)
 
@@ -49,12 +66,7 @@ uv sync
 uv run python main.py
 ```
 
-A GUI window will open. Enter the server IP, click Connect, then choose:
-
-| Button | What it does |
-|--------|--------------|
-| **GPU Provider** | Runs the worker — shows live GPU stats (utilization, VRAM, temp) |
-| **GPU User** | Submit compute jobs, see available GPUs, view results |
+A GUI window will open. Enter the server IP, click Connect, then choose **"I'm a GPU User"** to submit compute jobs and see available GPUs.
 
 ---
 
