@@ -43,7 +43,7 @@ SIGNOZ_ENDPOINT = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhos
 
 tracer = trace.NoOpTracer()
 logger = logging.getLogger("gpu-pod")
-meter = metrics.noop_meter()
+meter = metrics.get_meter("gpu-pod", "0.1.0")
 
 _INITIALIZED = False
 
