@@ -10,33 +10,8 @@ GPUs are expensive and unevenly distributed. A developer might have a Mac with n
 
 ---
 
-## What it does
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     Your Network                         │
-│                                                          │
-│   ┌──────────┐    submit job     ┌──────────┐           │
-│   │   Mac    │ ────────────────▶ │  Server  │           │
-│   │ (User)   │                   │ (FastAPI)│           │
-│   │ No GPU   │ ◀──── result ──── │  SQLite  │           │
-│   └────┬─────┘                   └────┬─────┘           │
-│        │                             │                  │
-│   ┌────▼─────────────────────────────▼──────┐           │
-│   │          SigNoz (Docker)                │           │
-│   │   Traces · Logs · Metrics · Alerts      │           │
-│   │   OTLP gRPC @ localhost:4317            │           │
-│   └─────────────────────────────────────────┘           │
-│                                                          │
-│   ┌──────────┐   heartbeat + assign    ┌──────────┐     │
-│   │ Windows  │ ◀────────────────────── │  Worker  │     │
-│   │ Laptop   │ ────── execute ────────▶ │ (PyTorch)│     │
-│   │ GTX 1650 │   matrix multiply       │  CUDA    │     │
-│   └──────────┘                         └──────────┘     │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Sequence Diagram (Mermaid)
+### Diagram
 
 ```mermaid
 sequenceDiagram
