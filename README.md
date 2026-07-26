@@ -41,34 +41,20 @@ You'll see:
 
 > **Note:** The `pyproject.toml` is pre-configured to pull the CUDA 12.4 build of PyTorch from `download.pytorch.org/whl/cu124`. If your NVIDIA driver supports a different CUDA version, change `cu124` in `pyproject.toml` to your version (e.g. `cu118`, `cu121`). Check with `nvidia-smi`.
 
-### 3. Run a compute job (on your Mac)
+### 3. Launch the desktop app (on your Mac)
 
 ```bash
 cd client
 uv sync
-export GPU_POD_SERVER_URL=http://<mac-ip>:8000
-
-# Run a 2048x2048 matrix multiply on the remote GPU
-python client.py compute --size 2048
-
-# Or just get GPU info
-python client.py info
+uv run python main.py
 ```
 
-Output:
-```
-✅ Submitted compute job (2048x2048 matrix multiply)
-   Job ID: e5f6g7h8
-  [assigned] waiting...
-  [completed] waiting...
+A GUI window will open. Enter the server IP, click Connect, then choose:
 
-  Job ID    : e5f6g7h8
-  Type      : compute
-  Status    : completed
-  Worker    : a1b2c3d4
-
-✅ Job completed!
-```
+| Button | What it does |
+|--------|--------------|
+| **GPU Provider** | Runs the worker — shows live GPU stats (utilization, VRAM, temp) |
+| **GPU User** | Submit compute jobs, see available GPUs, view results |
 
 ---
 
@@ -78,29 +64,14 @@ Output:
 |-----------|--------------|
 | `server/` | FastAPI coordinator — queues jobs, tracks workers (SQLite) |
 | `worker/` | Simple Python worker — registers, heartbeats, runs GPU tensor ops |
-| `client/` | CLI — submit compute jobs, check results, list workers |
+| `client/` | Desktop GUI — connect, choose provider or user, monitor/submit jobs |
 
-**No ML models, no Docker, no Redis.** Just PyTorch tensor operations on your GPU.
+## GUI screenshots
 
-## CLI commands
-
-```bash
-python client.py compute --size 4096      # Run matrix multiply benchmark
-python client.py info                      # Get GPU name/CUDA info
-python client.py status <job_id>           # Check job status
-python client.py list                      # List all jobs
-python client.py workers                   # List registered workers
-```
-
-## What the worker runs
-
-The worker does **simple GPU compute** — no model downloads, no Hugging Face:
-
-- **`compute`** — Matrix multiplication benchmark (reports TFLOPS)
-- **`tensor-info`** — GPU name, CUDA version, VRAM usage
-- **Custom code** — Send any PyTorch code in the `prompt` field
-
-When you want to add real AI models later, just edit `execute_job()` in `worker/worker.py`.
+**Connect screen** — enter server IP and port
+**Role select** — "GPU Provider" or "GPU User"
+**Provider dashboard** — live GPU utilization bars, VRAM, temperature, worker log
+**User dashboard** — available GPUs list, matrix size slider, job history with results
 
 ## Tips
 
