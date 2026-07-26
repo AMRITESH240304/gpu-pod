@@ -1,6 +1,6 @@
 # GPU Pod — Remote GPU Access for Everyone
 
-> **SigNoz Hackathon 2026 — Track 3 (OpenTelemetry/Python)**
+> **SigNoz Hackathon 2026 — Track 3 **
 
 ## Problem Statement
 
