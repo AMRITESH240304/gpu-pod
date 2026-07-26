@@ -18,6 +18,12 @@ from tkinter import ttk, messagebox
 from . import gpu_utils
 from . import worker as worker_engine
 
+# ── OTel ──
+from gpu_pod_otel import tracer, logger, meter
+
+# Custom metrics
+jobs_submitted = meter.create_counter("client.jobs.submitted", unit="1", description="Jobs submitted from this client")
+
 
 class GPUApp:
     def __init__(self):
@@ -77,15 +83,21 @@ class GPUApp:
         self.connect_btn.configure(state="disabled", text="Connecting...")
         self.root.update()
 
-        try:
-            r = requests.get(f"{url}/", timeout=5)
-            r.raise_for_status()
-            self.server_url = url
-            self.status_label.configure(text="Connected!", text_color="green")
-            self.root.after(500, self.show_role_select)
-        except Exception as e:
-            self.status_label.configure(text=f"Connection failed: {e}", text_color="red")
-            self.connect_btn.configure(state="normal", text="Connect")
+        with tracer.start_as_current_span("client.connect") as span:
+            span.set_attribute("server.url", url)
+            try:
+                r = requests.get(f"{url}/", timeout=5)
+                r.raise_for_status()
+                self.server_url = url
+                span.set_attribute("success", True)
+                logger.info("connected to server", extra={"url": url})
+                self.status_label.configure(text="Connected!", text_color="green")
+                self.root.after(500, self.show_role_select)
+            except Exception as e:
+                span.set_attribute("success", False)
+                span.set_attribute("error", str(e))
+                self.status_label.configure(text=f"Connection failed: {e}", text_color="red")
+                self.connect_btn.configure(state="normal", text="Connect")
 
     # ──────────────────── ROLE SELECT SCREEN ────────────────────
 
@@ -121,13 +133,13 @@ class GPUApp:
                          font=ctk.CTkFont(size=11), text_color="orange").pack(pady=(20, 0))
 
     def _try_show_provider(self):
+        logger.info("user selected provider mode")
         if not gpu_utils.check_torch_cuda():
             ret = messagebox.askyesno("PyTorch CUDA Required",
                 "Provider mode requires PyTorch with CUDA.\n\n"
                 "Install with:\n  uv add torch\n\n"
                 "Install now on this machine?")
             if ret:
-                from tkinter import messagebox as mb
                 self._install_torch_and_show_provider()
             return
         self.show_provider()
@@ -347,20 +359,26 @@ class GPUApp:
         self.submit_btn.configure(state="disabled", text="Submitting...")
         self.user_status.configure(text="")
 
-        def submit():
-            try:
-                r = requests.post(f"{self.server_url}/submit-job", json={
-                    "task_type": "compute", "prompt": "", "params": {"size": size},
-                }, timeout=10)
-                r.raise_for_status()
-                job_id = r.json()["job_id"]
-                self.user_status.configure(text=f"✅ Submitted: {job_id}", text_color="green")
-                self._log_result(f"Job {job_id} submitted ({size}x{size})\nWaiting for result...\n")
-                self._poll_single_job(job_id)
-            except Exception as e:
-                self.user_status.configure(text=f"❌ {e}", text_color="red")
-            finally:
-                self.submit_btn.configure(state="normal", text="🚀 Submit Compute Job")
+        with tracer.start_as_current_span("client.submit_job") as span:
+            span.set_attribute("matrix.size", size)
+            def submit():
+                try:
+                    r = requests.post(f"{self.server_url}/submit-job", json={
+                        "task_type": "compute", "prompt": "", "params": {"size": size},
+                    }, timeout=10)
+                    r.raise_for_status()
+                    job_id = r.json()["job_id"]
+                    jobs_submitted.add(1)
+                    span.set_attribute("job.id", job_id)
+                    logger.info("job submitted from client", extra={"job_id": job_id, "size": size})
+                    self.user_status.configure(text=f"✅ Submitted: {job_id}", text_color="green")
+                    self._log_result(f"Job {job_id} submitted ({size}x{size})\nWaiting for result...\n")
+                    self._poll_single_job(job_id)
+                except Exception as e:
+                    span.set_attribute("error", str(e))
+                    self.user_status.configure(text=f"❌ {e}", text_color="red")
+                finally:
+                    self.submit_btn.configure(state="normal", text="🚀 Submit Compute Job")
 
         threading.Thread(target=submit, daemon=True).start()
 

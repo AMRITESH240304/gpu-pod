@@ -6,6 +6,10 @@ dependencies = [
     "requests>=2.31.0",
     "customtkinter>=5.2.0",
     "torch",
+    "opentelemetry-api>=1.29.0",
+    "opentelemetry-sdk>=1.29.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.29.0",
+    "opentelemetry-instrumentation-logging>=0.52b0",
 ]
 
 [tool.uv]
